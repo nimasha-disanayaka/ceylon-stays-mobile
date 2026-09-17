@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "RoamLanka Foreigner App",
+    "slug": "booking-platform-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
