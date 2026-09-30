@@ -31,16 +31,15 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
+    fetchMyBookings();
+    const interval = setInterval(() => {
       fetchMyBookings();
-    } else {
-      setLoading(false);
-    }
+    }, 3000);
+    return () => clearInterval(interval);
   }, [currentUser]);
 
   const fetchMyBookings = async () => {
     try {
-      setLoading(true);
       const res = await apiClient.get('/bookings/my-bookings');
       const fetchedBookings = res.data.bookings || [];
       setBookings(fetchedBookings);
