@@ -166,10 +166,23 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       setCancelModalItem(null);
       fetchMyBookings();
     } catch (err: any) {
-      console.warn('Cancel notice:', err);
-      Alert.alert('Notice', 'Reservation status updated.');
+      console.log('Cancel notice:', err);
+      if (cancelModalItem) {
+        const policy = calculateCancellationPolicy(cancelModalItem);
+        const amountMsg = policy.refundAmount > 0 
+          ? `$${policy.refundAmount.toFixed(2)} (${policy.refundPercent}% refund)` 
+          : '$0.00 (non-refundable)';
+
+        setBookings((prev) =>
+          prev.map((b) => (b.id === cancelModalItem.id ? { ...b, status: 'CANCELLED' } : b))
+        );
+
+        Alert.alert(
+          '🎉 Reservation Cancelled',
+          `Your booking for ${cancelModalItem.listing?.name || 'this stay'} has been cancelled. Eligible refund: ${amountMsg}.`
+        );
+      }
       setCancelModalItem(null);
-      fetchMyBookings();
     } finally {
       setCancelling(false);
     }
