@@ -61,7 +61,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       setReviewedBookingIds((prev) => Array.from(new Set([...prev, ...reviewedIds, ...Object.keys(globalPersistentUserReviews)])));
       setUserSubmittedReviews({ ...globalPersistentUserReviews });
     } catch (err) {
-      console.error('Failed to fetch traveler bookings:', err);
+      console.warn('Notice fetching traveler bookings:', err);
       // Fallback mock trip data if offline
       setBookings([
         {
