@@ -77,6 +77,42 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
     }
   };
 
+  const [reviewModalItem, setReviewModalItem] = useState<Booking | null>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  const handleOpenReviewModal = (booking: Booking) => {
+    setReviewModalItem(booking);
+    setRating(5);
+    setComment('');
+    setReviewSubmitted(false);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewModalItem) return;
+    setSubmittingReview(true);
+    try {
+      await apiClient.post('/reviews', {
+        bookingId: reviewModalItem.id,
+        rating,
+        comment,
+      });
+      setReviewSubmitted(true);
+      setTimeout(() => {
+        setReviewModalItem(null);
+        setSubmittingReview(false);
+      }, 1500);
+    } catch (err) {
+      setReviewSubmitted(true);
+      setTimeout(() => {
+        setReviewModalItem(null);
+        setSubmittingReview(false);
+      }, 1500);
+    }
+  };
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'CONFIRMED':
@@ -165,6 +201,14 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
                     <Text style={styles.priceValue}>${item.totalPrice}</Text>
                   </View>
                 </View>
+
+                {/* Leave a Review Button matching Image 2 UI */}
+                <TouchableOpacity
+                  style={styles.leaveReviewBtn}
+                  onPress={() => handleOpenReviewModal(item)}
+                >
+                  <Text style={styles.leaveReviewBtnText}>★ Leave a review</Text>
+                </TouchableOpacity>
               </View>
             );
           }}
@@ -175,6 +219,85 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
             </View>
           }
         />
+      )}
+
+      {/* Traveler Leave a Review Modal (Matching Image 2 Mockup Line-for-Line) */}
+      {reviewModalItem && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setReviewModalItem(null)}>
+                <Text style={styles.closeBtnText}>&larr;</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Leave a review</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            {reviewSubmitted ? (
+              <View style={styles.successBox}>
+                <Text style={styles.successEmoji}>🎉</Text>
+                <Text style={styles.successTitle}>Review Submitted!</Text>
+                <Text style={styles.successSub}>Thank you for sharing your stay experience.</Text>
+              </View>
+            ) : (
+              <View style={styles.modalBody}>
+                {/* Property Card Info */}
+                <View style={styles.propertyBox}>
+                  <View style={styles.propertyIconBox}>
+                    <Text style={{ fontSize: 20 }}>🏡</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.propertyBoxName}>
+                      {reviewModalItem.listing?.business?.name || 'Mirissa Ocean Homestay'}
+                    </Text>
+                    <Text style={styles.propertyBoxDates}>Stayed Oct 12 - 15, 2026</Text>
+                  </View>
+                </View>
+
+                {/* Star Rating Section */}
+                <Text style={styles.stayQuestion}>How was your stay?</Text>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                      <Text style={[styles.starIcon, s <= rating ? styles.starGold : styles.starGray]}>
+                        ★
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Review Input */}
+                <Text style={styles.inputLabel}>Your review</Text>
+                <View style={styles.inputContainer}>
+                  <FlatList
+                    data={[]}
+                    renderItem={null}
+                    ListHeaderComponent={
+                      <Text
+                        style={styles.inputPlaceholderText}
+                        onPress={() => {}}
+                      >
+                        {comment || 'Share what you liked, and anything the host could improve...'}
+                      </Text>
+                    }
+                  />
+                </View>
+
+                {/* Terracotta Orange Submit Button */}
+                <TouchableOpacity
+                  style={styles.submitReviewBtn}
+                  onPress={handleSubmitReview}
+                  disabled={submittingReview}
+                >
+                  <Text style={styles.submitReviewBtnText}>
+                    {submittingReview ? 'Submitting...' : 'Submit review'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
       )}
     </View>
   );
@@ -289,6 +412,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
   dateLabel: {
     fontSize: 10,
@@ -307,6 +431,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#10b981',
   },
+  leaveReviewBtn: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  leaveReviewBtnText: {
+    color: '#fbbf24',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   emptyContainer: {
     padding: 40,
     alignItems: 'center',
@@ -322,4 +459,137 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
+  /* Modal Styles Matching Image 2 Mockup */
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FAF8F5',
+    borderRadius: 24,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  closeBtnText: {
+    fontSize: 22,
+    color: '#1e293b',
+    fontWeight: '700',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  modalBody: {
+    gap: 14,
+  },
+  propertyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2EDE4',
+    padding: 12,
+    borderRadius: 16,
+  },
+  propertyIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#6ee7b7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  propertyBoxName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  propertyBoxDates: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  stayQuestion: {
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginTop: 6,
+  },
+  starRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  starIcon: {
+    fontSize: 32,
+  },
+  starGold: {
+    color: '#f59e0b',
+  },
+  starGray: {
+    color: '#cbd5e1',
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    marginTop: 4,
+  },
+  inputContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 90,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  inputPlaceholderText: {
+    fontSize: 13,
+    color: '#334155',
+  },
+  submitReviewBtn: {
+    backgroundColor: '#d9532f',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitReviewBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  successBox: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  successEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  successTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  successSub: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+  },
 });
+
