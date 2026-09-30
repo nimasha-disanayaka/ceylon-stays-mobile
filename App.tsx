@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, StatusBar } from 'react-native';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { MyTripsScreen } from './src/screens/MyTripsScreen';
@@ -18,7 +18,7 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#070a12" />
 
       {/* Main Screen Content */}
@@ -79,7 +79,7 @@ export default function App() {
         onClose={() => setAuthVisible(false)}
         onAuthSuccess={(user) => setCurrentUser(user)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
