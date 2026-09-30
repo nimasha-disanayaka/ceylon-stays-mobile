@@ -39,7 +39,14 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
     try {
       setLoading(true);
       const res = await apiClient.get('/bookings/my-bookings');
-      setBookings(res.data.bookings || []);
+      const fetchedBookings = res.data.bookings || [];
+      setBookings(fetchedBookings);
+
+      // Automatically mark bookings that already have reviews submitted in DB
+      const reviewedIds = fetchedBookings
+        .filter((b: any) => b.review !== null && b.review !== undefined)
+        .map((b: any) => b.id);
+      setReviewedBookingIds((prev) => Array.from(new Set([...prev, ...reviewedIds])));
     } catch (err) {
       console.error('Failed to fetch traveler bookings:', err);
       // Fallback mock trip data if offline
@@ -83,7 +90,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>([]);
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>(['booking-1']);
 
   const handleOpenReviewModal = (booking: Booking) => {
     setReviewModalItem(booking);
@@ -96,11 +103,14 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
     if (!reviewModalItem) return;
     setSubmittingReview(true);
     const targetId = reviewModalItem.id;
+    const authorName = currentUser?.name || currentUser?.email?.split('@')[0] || 'John M.';
+
     try {
       await apiClient.post('/reviews', {
         bookingId: targetId,
         rating,
         comment,
+        authorName,
       });
       setReviewedBookingIds((prev) => [...prev, targetId]);
       setReviewSubmitted(true);
