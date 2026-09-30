@@ -9,7 +9,12 @@ import { Listing, User } from './src/types';
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<'SEARCH' | 'DETAIL' | 'MY_TRIPS'>('SEARCH');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>({
+    id: 'user-traveler-1',
+    name: 'John M.',
+    email: 'traveler@gmail.com',
+    role: 'FOREIGNER',
+  });
   const [authVisible, setAuthVisible] = useState(false);
 
   const handleSelectListing = (listing: Listing) => {

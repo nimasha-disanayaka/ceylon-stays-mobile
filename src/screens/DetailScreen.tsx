@@ -92,14 +92,6 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const totalPrice = totalNights * listing.pricePerNight;
 
   const handleBookingSubmit = async () => {
-    if (!currentUser) {
-      Alert.alert('Authentication Required', 'Please sign in to confirm your booking reservation.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign In / Register', onPress: onOpenAuth },
-      ]);
-      return;
-    }
-
     // 1. Validate Check-In Date
     const checkInErr = validateDateString(checkIn, 'Check-In Date');
     if (checkInErr) {
