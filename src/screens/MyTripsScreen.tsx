@@ -7,7 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Image,
+  Alert,
+  Modal,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { Booking } from '../types';
 import { apiClient } from '../api/client';
@@ -18,7 +22,7 @@ interface MyTripsScreenProps {
   currentUser: any;
 }
 
-// Persistent global memory store across logins & app sessions
+// Global review memory
 let globalPersistentUserReviews: { [bookingId: string]: { rating: number; comment: string } } = {};
 
 export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
@@ -29,6 +33,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'UPCOMING' | 'PENDING' | 'COMPLETED'>('ALL');
 
   useEffect(() => {
     fetchMyBookings();
@@ -44,9 +49,8 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       const fetchedBookings = res.data.bookings || [];
       setBookings(fetchedBookings);
 
-      // Extract reviews attached to bookings
+      // Extract DB reviews
       const reviewedIds: string[] = [];
-
       fetchedBookings.forEach((b: any) => {
         if (b.review) {
           reviewedIds.push(b.id);
@@ -61,36 +65,6 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       setUserSubmittedReviews({ ...globalPersistentUserReviews });
     } catch (err) {
       console.warn('Notice fetching traveler bookings:', err);
-      // Fallback mock trip data if offline
-      setBookings([
-        {
-          id: 'booking-1',
-          listingId: 'mock-1',
-          userId: 'user-1',
-          checkIn: '2026-10-10T14:00:00.000Z',
-          checkOut: '2026-10-15T11:00:00.000Z',
-          totalNights: 5,
-          totalPrice: 600,
-          status: 'CONFIRMED',
-          createdAt: new Date().toISOString(),
-          listing: {
-            id: 'mock-1',
-            businessId: 'biz-1',
-            title: 'Mirissa Ocean View Boutique Villa',
-            description: 'Panoramic Indian Ocean views',
-            pricePerNight: 120,
-            maxGuests: 4,
-            amenities: ['Ocean View'],
-            images: ['https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'],
-            business: {
-              id: 'biz-1',
-              name: 'Mirissa Bay Resort',
-              type: 'HOTEL',
-              address: 'Beach Road, Mirissa',
-            },
-          },
-        },
-      ]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -98,6 +72,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   };
 
   const [reviewModalItem, setReviewModalItem] = useState<Booking | null>(null);
+  const [detailsModalItem, setDetailsModalItem] = useState<Booking | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -142,18 +117,75 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
     }, 1500);
   };
 
+  const handleCancelBooking = async (bookingId: string) => {
+    Alert.alert(
+      'Cancel Reservation Request',
+      'Are you sure you want to cancel this booking? Free cancellation policy applies.',
+      [
+        { text: 'Keep Stay', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.patch(`/bookings/${bookingId}/status`, { status: 'CANCELLED' });
+              fetchMyBookings();
+              Alert.alert('Reservation Cancelled', 'Your booking reservation has been cancelled.');
+            } catch (err) {
+              Alert.alert('Notice', 'Failed to update reservation status.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Friendly Date Format: Oct 10 – 15, 2026
+  const formatDateRange = (checkInStr: string, checkOutStr: string) => {
+    try {
+      const inDate = new Date(checkInStr);
+      const outDate = new Date(checkOutStr);
+      if (isNaN(inDate.getTime()) || isNaN(outDate.getTime())) {
+        return `${checkInStr.split('T')[0]} to ${checkOutStr.split('T')[0]}`;
+      }
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const inMonth = months[inDate.getMonth()];
+      const outMonth = months[outDate.getMonth()];
+      const inDay = inDate.getDate();
+      const outDay = outDate.getDate();
+      const year = inDate.getFullYear();
+
+      if (inMonth === outMonth) {
+        return `${inMonth} ${inDay} – ${outDay}, ${year}`;
+      }
+      return `${inMonth} ${inDay} – ${outMonth} ${outDay}, ${year}`;
+    } catch {
+      return `${checkInStr.split('T')[0]} to ${checkOutStr.split('T')[0]}`;
+    }
+  };
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'CONFIRMED':
-        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', border: 'rgba(16, 185, 129, 0.3)' };
+        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', border: 'rgba(16, 185, 129, 0.3)', label: 'CONFIRMED' };
       case 'PENDING':
-        return { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' };
+        return { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)', label: 'PENDING' };
       case 'CANCELLED':
-        return { bg: 'rgba(244, 63, 94, 0.15)', text: '#f43f5e', border: 'rgba(244, 63, 94, 0.3)' };
+        return { bg: 'rgba(244, 63, 94, 0.15)', text: '#f43f5e', border: 'rgba(244, 63, 94, 0.3)', label: 'CANCELLED' };
+      case 'COMPLETED':
+        return { bg: 'rgba(6, 182, 212, 0.15)', text: '#06b6d4', border: 'rgba(6, 182, 212, 0.3)', label: 'COMPLETED' };
       default:
-        return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)' };
+        return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)', label: status };
     }
   };
+
+  // Filter Bookings by Active Tab
+  const filteredBookings = bookings.filter((b) => {
+    if (activeTab === 'UPCOMING') return b.status === 'CONFIRMED';
+    if (activeTab === 'PENDING') return b.status === 'PENDING';
+    if (activeTab === 'COMPLETED') return b.status === 'COMPLETED';
+    return true;
+  });
 
   return (
     <View style={styles.container}>
@@ -163,6 +195,27 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
           <Text style={styles.backButtonText}>&larr; Back to Search</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Trips & Bookings</Text>
+      </View>
+
+      {/* Filter Tabs Bar */}
+      <View style={styles.tabsContainer}>
+        {[
+          { id: 'ALL', label: 'All Trips' },
+          { id: 'UPCOMING', label: 'Upcoming' },
+          { id: 'PENDING', label: 'Pending' },
+          { id: 'COMPLETED', label: 'Completed' },
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tabButton, isActive && styles.tabButtonActive]}
+              onPress={() => setActiveTab(tab.id as any)}
+            >
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {!currentUser ? (
@@ -180,7 +233,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
         </View>
       ) : (
         <FlatList
-          data={bookings}
+          data={filteredBookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -195,38 +248,48 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
           }
           renderItem={({ item }) => {
             const statusStyle = getStatusStyle(item.status);
-            const formattedCheckIn = item.checkIn.split('T')[0];
-            const formattedCheckOut = item.checkOut.split('T')[0];
+            const formattedDates = formatDateRange(item.checkIn, item.checkOut);
 
             const activeReview = userSubmittedReviews[item.id] || (item as any).review;
             const isReviewed = reviewedBookingIds.includes(item.id) || !!activeReview;
+            const isCompleted = item.status === 'COMPLETED';
+
+            const imageUrl = item.listing?.images?.[0] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
 
             return (
               <View style={styles.tripCard}>
-                <View style={styles.tripHeader}>
-                  <Text style={styles.propertyName} numberOfLines={1}>
-                    {item.listing?.title || 'Property Reservation'}
-                  </Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: statusStyle.bg, borderColor: statusStyle.border },
-                    ]}
-                  >
-                    <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                      {item.status}
+                {/* Top Row: Thumbnail Image + Title & Status */}
+                <View style={styles.tripTopRow}>
+                  <Image source={{ uri: imageUrl }} style={styles.propertyThumb} />
+                  
+                  <View style={styles.tripMeta}>
+                    <View style={styles.titleStatusRow}>
+                      <Text style={styles.propertyName} numberOfLines={1}>
+                        {item.listing?.name || item.listing?.title || 'Property Stay'}
+                      </Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: statusStyle.bg, borderColor: statusStyle.border },
+                        ]}
+                      >
+                        <Text style={[styles.statusText, { color: statusStyle.text }]}>
+                          {statusStyle.label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.hostName} numberOfLines={1}>
+                      📍 {item.listing?.business?.name || 'Local Host'} • {item.listing?.business?.address || 'Sri Lanka'}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={styles.hostName}>
-                  📍 {item.listing?.business?.name || 'Local Partner'} • {item.listing?.business?.address}
-                </Text>
-
+                {/* Date & Pricing Bar */}
                 <View style={styles.datesBox}>
                   <View>
-                    <Text style={styles.dateLabel}>Dates</Text>
-                    <Text style={styles.dateValue}>{formattedCheckIn} to {formattedCheckOut}</Text>
+                    <Text style={styles.dateLabel}>Stay Dates</Text>
+                    <Text style={styles.dateValue}>{formattedDates}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.dateLabel}>Total Amount</Text>
@@ -234,138 +297,184 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
                   </View>
                 </View>
 
-                {/* Submitted Review Display or Leave a Review Button */}
-                {isReviewed ? (
-                  <View style={styles.submittedReviewCardContainer}>
-                    <View style={styles.submittedReviewTopRow}>
-                      <View style={styles.submittedTagBadge}>
-                        <Text style={styles.submittedTagBadgeText}>✓ Review Submitted</Text>
-                      </View>
-                      <View style={styles.starRatingRow}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Text
-                            key={s}
-                            style={[
-                              styles.starSymbol,
-                              s <= (activeReview?.rating || 5)
-                                ? styles.goldStarSymbol
-                                : styles.grayStarSymbol,
-                            ]}
-                          >
-                            ★
-                          </Text>
-                        ))}
-                      </View>
+                {/* Context-aware Actions & Review Section */}
+                {item.status === 'PENDING' && (
+                  <View style={styles.pendingActionRow}>
+                    <View style={styles.pendingNoteBox}>
+                      <Text style={styles.pendingNoteText}>⏳ Awaiting host confirmation</Text>
                     </View>
-                    <Text style={styles.submittedReviewTextBody}>
-                      "{activeReview?.comment || 'Beautiful stay, walking distance to the beach, host was incredibly kind.'}"
-                    </Text>
-
-                    {/* Host Reply Container if Host replied */}
-                    {(activeReview?.reply || (item as any).review?.reply) ? (
-                      <View style={styles.hostResponseCard}>
-                        <Text style={styles.hostResponseTitle}>
-                          💬 Host Reply ({item.listing?.business?.name || 'Property Owner'}):
-                        </Text>
-                        <Text style={styles.hostResponseText}>
-                          "{activeReview?.reply || (item as any).review?.reply}"
-                        </Text>
-                      </View>
-                    ) : null}
+                    <TouchableOpacity
+                      style={styles.cancelBtnOutline}
+                      onPress={() => handleCancelBooking(item.id)}
+                    >
+                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.leaveReviewBtn}
-                    onPress={() => handleOpenReviewModal(item)}
-                  >
-                    <Text style={styles.leaveReviewBtnText}>★ Leave a review</Text>
-                  </TouchableOpacity>
+                )}
+
+                {item.status === 'CONFIRMED' && (
+                  <View style={styles.confirmedActionRow}>
+                    <TouchableOpacity
+                      style={styles.viewDetailsBtn}
+                      onPress={() => setDetailsModalItem(item)}
+                    >
+                      <Text style={styles.viewDetailsBtnText}>View Details</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.cancelBtnOutline}
+                      onPress={() => handleCancelBooking(item.id)}
+                    >
+                      <Text style={styles.cancelBtnText}>Cancel Stay</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {isCompleted && (
+                  <>
+                    {isReviewed ? (
+                      <View style={styles.submittedReviewCardContainer}>
+                        <View style={styles.submittedReviewTopRow}>
+                          <View style={styles.submittedTagBadge}>
+                            <Text style={styles.submittedTagBadgeText}>✓ Review Submitted</Text>
+                          </View>
+                          <View style={styles.starRatingRow}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Text
+                                key={s}
+                                style={[
+                                  styles.starSymbol,
+                                  s <= (activeReview?.rating || 5)
+                                    ? styles.goldStarSymbol
+                                    : styles.grayStarSymbol,
+                                ]}
+                              >
+                                ★
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+                        <Text style={styles.submittedReviewTextBody}>
+                          "{activeReview?.comment || 'Beautiful stay, host was very welcoming.'}"
+                        </Text>
+
+                        {activeReview?.reply && (
+                          <View style={styles.hostResponseCard}>
+                            <Text style={styles.hostResponseTitle}>
+                              💬 Host Reply ({item.listing?.business?.name || 'Host'}):
+                            </Text>
+                            <Text style={styles.hostResponseText}>
+                              "{activeReview.reply}"
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.leaveReviewBtn}
+                        onPress={() => handleOpenReviewModal(item)}
+                      >
+                        <Text style={styles.leaveReviewBtnText}>★ Leave a Review for Host</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
               </View>
             );
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No trips booked yet</Text>
-              <Text style={styles.emptySub}>Explore hotels, homestays, and dining experiences in Sri Lanka!</Text>
+              <Text style={styles.emptyTitle}>No reservations in this tab</Text>
+              <Text style={styles.emptySub}>Explore Sri Lanka hotels, homestays, and boutique stays!</Text>
             </View>
           }
         />
       )}
 
-      {/* Traveler Leave a Review Modal (Matching Image 2 Mockup Line-for-Line) */}
-      {reviewModalItem && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setReviewModalItem(null)}>
-                <Text style={styles.closeBtnText}>&larr;</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Leave a review</Text>
-              <View style={{ width: 24 }} />
-            </View>
+      {/* Details Modal */}
+      {detailsModalItem && (
+        <Modal visible={true} transparent={true} animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Trip Reservation Details</Text>
+              <Text style={styles.modalSubtitle}>{detailsModalItem.listing?.name}</Text>
 
-            {reviewSubmitted ? (
-              <View style={styles.successBox}>
-                <Text style={styles.successEmoji}>🎉</Text>
-                <Text style={styles.successTitle}>Review Submitted!</Text>
-                <Text style={styles.successSub}>Thank you for sharing your stay experience.</Text>
+              <View style={styles.detailRowModal}>
+                <Text style={styles.detailLabelModal}>Host:</Text>
+                <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.name || 'Local Host'}</Text>
               </View>
-            ) : (
-              <View style={styles.modalBody}>
-                {/* Property Card Info */}
-                <View style={styles.propertyBox}>
-                  <View style={styles.propertyIconBox}>
-                    <Text style={{ fontSize: 20 }}>🏡</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.propertyBoxName}>
-                      {reviewModalItem.listing?.business?.name || 'Mirissa Ocean Homestay'}
-                    </Text>
-                    <Text style={styles.propertyBoxDates}>Stayed Oct 12 - 15, 2026</Text>
-                  </View>
-                </View>
+              <View style={styles.detailRowModal}>
+                <Text style={styles.detailLabelModal}>Address:</Text>
+                <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.address || 'Sri Lanka'}</Text>
+              </View>
+              <View style={styles.detailRowModal}>
+                <Text style={styles.detailLabelModal}>Stay Dates:</Text>
+                <Text style={styles.detailValModal}>{formatDateRange(detailsModalItem.checkIn, detailsModalItem.checkOut)}</Text>
+              </View>
+              <View style={styles.detailRowModal}>
+                <Text style={styles.detailLabelModal}>Total Price:</Text>
+                <Text style={styles.detailValModalPrice}>${detailsModalItem.totalPrice}</Text>
+              </View>
 
-                {/* Star Rating Section */}
-                <Text style={styles.stayQuestion}>How was your stay?</Text>
-                <View style={styles.starRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <TouchableOpacity key={s} onPress={() => setRating(s)}>
-                      <Text style={[styles.starIcon, s <= rating ? styles.starGold : styles.starGray]}>
-                        ★
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              <TouchableOpacity
+                style={styles.closeDetailsBtn}
+                onPress={() => setDetailsModalItem(null)}
+              >
+                <Text style={styles.closeDetailsBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
 
-                {/* Review Input */}
-                <Text style={styles.inputLabel}>Your review</Text>
-                <TextInput
-                  style={styles.reviewTextInput}
-                  value={comment}
-                  onChangeText={setComment}
-                  placeholder="Share what you liked, and anything the host could improve..."
-                  placeholderTextColor="#94a3b8"
-                  multiline={true}
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
+      {/* Leave a Review Modal */}
+      {reviewModalItem && (
+        <Modal visible={true} transparent={true} animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Rate Your Stay Experience</Text>
+              <Text style={styles.modalSubtitle}>{reviewModalItem.listing?.name}</Text>
 
-                {/* Terracotta Orange Submit Button */}
+              <View style={styles.starPickerRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                    <Text style={[styles.starPickerSymbol, s <= rating && styles.starPickerActive]}>★</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Share your experience with future travelers..."
+                placeholderTextColor="#64748b"
+                multiline={true}
+                value={comment}
+                onChangeText={setComment}
+              />
+
+              <View style={styles.modalActionsRow}>
                 <TouchableOpacity
-                  style={styles.submitReviewBtn}
+                  style={styles.cancelModalBtn}
+                  onPress={() => setReviewModalItem(null)}
+                >
+                  <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.submitModalBtn}
                   onPress={handleSubmitReview}
                   disabled={submittingReview}
                 >
-                  <Text style={styles.submitReviewBtnText}>
-                    {submittingReview ? 'Submitting...' : 'Submit review'}
-                  </Text>
+                  {submittingReview ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.submitModalBtnText}>Submit Review</Text>
+                  )}
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
           </View>
-        </View>
+        </Modal>
       )}
     </View>
   );
@@ -375,87 +484,94 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#070a12',
-    paddingTop: 50,
   },
   header: {
+    paddingTop: 50,
     paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingBottom: 12,
+    backgroundColor: '#0d1322',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   backButton: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   backButtonText: {
     color: '#10b981',
-    fontSize: 13,
     fontWeight: '700',
+    fontSize: 13,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#ffffff',
   },
-  authRequiredState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 30,
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0d1322',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
-  authTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
+  tabButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#131b2e',
   },
-  authSub: {
-    fontSize: 13,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  signInButton: {
+  tabButtonActive: {
     backgroundColor: '#10b981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 14,
   },
-  signInButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
+  tabText: {
     color: '#94a3b8',
-    marginTop: 12,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
+    padding: 16,
+    paddingBottom: 100,
   },
   tripCard: {
     backgroundColor: '#131b2e',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  tripHeader: {
+  tripTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  propertyThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: '#070a12',
+  },
+  tripMeta: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  titleStatusRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   propertyName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#ffffff',
-    marginRight: 10,
+    flex: 1,
+    marginRight: 6,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -466,130 +582,196 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 10,
     fontWeight: '800',
-    textTransform: 'uppercase',
   },
   hostName: {
     fontSize: 12,
     color: '#94a3b8',
-    marginBottom: 14,
   },
   datesBox: {
     backgroundColor: '#070a12',
-    padding: 12,
-    borderRadius: 12,
+    borderRadius: 10,
+    padding: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   dateLabel: {
     fontSize: 10,
     color: '#64748b',
-    textTransform: 'uppercase',
     fontWeight: '600',
-    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   dateValue: {
     fontSize: 12,
-    color: '#cbd5e1',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 2,
   },
   priceValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#10b981',
+    marginTop: 2,
   },
-  leaveReviewBtn: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-  },
-  leaveReviewBtnText: {
-    color: '#fbbf24',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  submittedReviewBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  submittedReviewBadgeText: {
-    color: '#10b981',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  submittedReviewCardContainer: {
-    backgroundColor: '#0a0f1d',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-  },
-  submittedReviewTopRow: {
+  pendingActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  pendingNoteBox: {
+    flex: 1,
+  },
+  pendingNoteText: {
+    fontSize: 11,
+    color: '#f59e0b',
+    fontWeight: '600',
+  },
+  confirmedActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  viewDetailsBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  viewDetailsBtnText: {
+    color: '#10b981',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  cancelBtnOutline: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 63, 94, 0.4)',
+    backgroundColor: 'rgba(244, 63, 94, 0.1)',
+  },
+  cancelBtnText: {
+    color: '#f43f5e',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  leaveReviewBtn: {
+    backgroundColor: '#10b981',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  leaveReviewBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  submittedReviewCardContainer: {
+    backgroundColor: '#070a12',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  submittedReviewTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
   submittedTagBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   submittedTagBadgeText: {
     color: '#10b981',
+    fontSize: 10,
     fontWeight: '800',
-    fontSize: 11,
   },
   starRatingRow: {
     flexDirection: 'row',
     gap: 2,
   },
   starSymbol: {
-    fontSize: 15,
+    fontSize: 12,
   },
   goldStarSymbol: {
     color: '#f59e0b',
   },
   grayStarSymbol: {
-    color: '#334155',
+    color: '#475569',
   },
   submittedReviewTextBody: {
-    color: '#e2e8f0',
     fontSize: 12,
+    color: '#cbd5e1',
     fontStyle: 'italic',
-    lineHeight: 18,
   },
   hostResponseCard: {
-    marginTop: 10,
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    padding: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3b82f6',
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#131b2e',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   hostResponseTitle: {
-    color: '#60a5fa',
     fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 3,
+    fontWeight: '700',
+    color: '#38bdf8',
+    marginBottom: 2,
   },
   hostResponseText: {
-    color: '#f1f5f9',
-    fontSize: 12,
-    fontStyle: 'normal',
-    lineHeight: 16,
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#94a3b8',
+    marginTop: 10,
+    fontSize: 13,
+  },
+  authRequiredState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  authTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  authSub: {
+    fontSize: 13,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  signInButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  signInButtonText: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
   emptyContainer: {
-    padding: 40,
+    paddingVertical: 40,
     alignItems: 'center',
   },
   emptyTitle: {
@@ -599,151 +781,116 @@ const styles = StyleSheet.create({
   },
   emptySub: {
     color: '#64748b',
-    fontSize: 13,
-    marginTop: 6,
-    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 4,
   },
-  /* Modal Styles Matching Image 2 Mockup */
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#FAF8F5',
-    borderRadius: 24,
+    backgroundColor: '#131b2e',
+    borderRadius: 20,
     padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  closeBtnText: {
-    fontSize: 22,
-    color: '#1e293b',
-    fontWeight: '700',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  modalBody: {
-    gap: 14,
-  },
-  propertyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2EDE4',
-    padding: 12,
-    borderRadius: 16,
-  },
-  propertyIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#6ee7b7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  propertyBoxName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  propertyBoxDates: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  stayQuestion: {
-    textAlign: 'center',
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginTop: 6,
-  },
-  starRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  starIcon: {
-    fontSize: 32,
-  },
-  starGold: {
-    color: '#f59e0b',
-  },
-  starGray: {
-    color: '#cbd5e1',
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 4,
-  },
-  inputContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    minHeight: 90,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  reviewTextInput: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    minHeight: 100,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    fontSize: 13,
-    color: '#0f172a',
-  },
-  inputPlaceholderText: {
-    fontSize: 13,
-    color: '#334155',
-  },
-  submitReviewBtn: {
-    backgroundColor: '#d9532f',
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  submitReviewBtnText: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  successBox: {
-    padding: 30,
-    alignItems: 'center',
-  },
-  successEmoji: {
-    fontSize: 40,
-    marginBottom: 10,
-  },
-  successTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#ffffff',
+    marginBottom: 4,
   },
-  successSub: {
+  modalSubtitle: {
     fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
+    color: '#94a3b8',
+    marginBottom: 16,
+  },
+  starPickerRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  starPickerSymbol: {
+    fontSize: 32,
+    color: '#475569',
+  },
+  starPickerActive: {
+    color: '#f59e0b',
+  },
+  commentInput: {
+    backgroundColor: '#070a12',
+    color: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    height: 90,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelModalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  cancelModalBtnText: {
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  submitModalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+  },
+  submitModalBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  detailRowModal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  detailLabelModal: {
+    color: '#94a3b8',
+    fontSize: 13,
+  },
+  detailValModal: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailValModalPrice: {
+    color: '#10b981',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  closeDetailsBtn: {
+    backgroundColor: '#10b981',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  closeDetailsBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
 });
-
