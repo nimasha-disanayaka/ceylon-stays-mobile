@@ -261,6 +261,18 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
                     <Text style={styles.submittedReviewTextBody}>
                       "{activeReview?.comment || 'Beautiful stay, walking distance to the beach, host was incredibly kind.'}"
                     </Text>
+
+                    {/* Host Reply Container if Host replied */}
+                    {(activeReview?.reply || (item as any).review?.reply) ? (
+                      <View style={styles.hostResponseCard}>
+                        <Text style={styles.hostResponseTitle}>
+                          💬 Host Reply ({item.listing?.business?.name || 'Property Owner'}):
+                        </Text>
+                        <Text style={styles.hostResponseText}>
+                          "{activeReview?.reply || (item as any).review?.reply}"
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 ) : (
                   <TouchableOpacity
@@ -556,6 +568,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     lineHeight: 18,
+  },
+  hostResponseCard: {
+    marginTop: 10,
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6',
+  },
+  hostResponseTitle: {
+    color: '#60a5fa',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  hostResponseText: {
+    color: '#f1f5f9',
+    fontSize: 12,
+    fontStyle: 'normal',
+    lineHeight: 16,
   },
   emptyContainer: {
     padding: 40,
