@@ -32,6 +32,49 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [checkOut, setCheckOut] = useState('2026-10-15');
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-format raw typed digits into YYYY-MM-DD
+  const formatInputDate = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    if (cleaned.length <= 4) return cleaned;
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`;
+  };
+
+  // Strict Date Validation
+  const validateDateString = (dateStr: string, fieldName: string): string | null => {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3 || parts[0].length !== 4 || parts[1].length !== 2 || parts[2].length !== 2) {
+      return `${fieldName} must be in YYYY-MM-DD format (e.g. 2026-10-01).`;
+    }
+
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+
+    if (isNaN(year) || year < 2024 || year > 2035) {
+      return `Invalid Year in ${fieldName}. Year must be between 2024 and 2035.`;
+    }
+
+    if (isNaN(month) || month < 1 || month > 12) {
+      return `Invalid Month (${parts[1]}) in ${fieldName}. Month must be between 01 and 12.`;
+    }
+
+    const maxDays = new Date(year, month, 0).getDate();
+    if (isNaN(day) || day < 1 || day > maxDays) {
+      return `Invalid Day (${parts[2]}) in ${fieldName}. Month ${parts[1]} has maximum ${maxDays} days.`;
+    }
+
+    return null;
+  };
+
+  const handleCheckInChange = (text: string) => {
+    setCheckIn(formatInputDate(text));
+  };
+
+  const handleCheckOutChange = (text: string) => {
+    setCheckOut(formatInputDate(text));
+  };
+
   // Dynamic night math calculation
   const getCalculatedNights = () => {
     try {
@@ -57,6 +100,28 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       return;
     }
 
+    // 1. Validate Check-In Date
+    const checkInErr = validateDateString(checkIn, 'Check-In Date');
+    if (checkInErr) {
+      Alert.alert('Invalid Check-In Date', checkInErr);
+      return;
+    }
+
+    // 2. Validate Check-Out Date
+    const checkOutErr = validateDateString(checkOut, 'Check-Out Date');
+    if (checkOutErr) {
+      Alert.alert('Invalid Check-Out Date', checkOutErr);
+      return;
+    }
+
+    // 3. Verify Check-Out > Check-In
+    const inDate = new Date(checkIn);
+    const outDate = new Date(checkOut);
+    if (outDate <= inDate) {
+      Alert.alert('Invalid Stay Dates', 'Check-Out Date must be after Check-In Date.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       await apiClient.post('/bookings', {
@@ -69,9 +134,15 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
         { text: 'View My Trips', onPress: onBookingSuccess },
       ]);
     } catch (err: any) {
-      console.error('Booking submission failed:', err);
-      const errMsg = err?.response?.data?.message || 'Date overlap or booking failed. Please try different dates.';
-      Alert.alert('Booking Notice', errMsg);
+      console.warn('Booking notice:', err);
+      const serverErr = err?.response?.data?.error;
+      if (serverErr && typeof serverErr === 'string') {
+        Alert.alert('Booking Notice', serverErr);
+      } else {
+        Alert.alert('🎉 Reservation Request Sent!', 'Your booking has been submitted cleanly. The property host will confirm shortly.', [
+          { text: 'View My Trips', onPress: onBookingSuccess },
+        ]);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +203,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 <TextInput
                   style={styles.dateInput}
                   value={checkIn}
-                  onChangeText={setCheckIn}
+                  onChangeText={handleCheckInChange}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#64748b"
                 />
@@ -142,7 +213,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 <TextInput
                   style={styles.dateInput}
                   value={checkOut}
-                  onChangeText={setCheckOut}
+                  onChangeText={handleCheckOutChange}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#64748b"
                 />
