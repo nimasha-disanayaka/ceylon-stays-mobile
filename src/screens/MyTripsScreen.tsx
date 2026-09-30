@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { Booking } from '../types';
 import { apiClient } from '../api/client';
@@ -269,20 +270,16 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
 
                 {/* Review Input */}
                 <Text style={styles.inputLabel}>Your review</Text>
-                <View style={styles.inputContainer}>
-                  <FlatList
-                    data={[]}
-                    renderItem={null}
-                    ListHeaderComponent={
-                      <Text
-                        style={styles.inputPlaceholderText}
-                        onPress={() => {}}
-                      >
-                        {comment || 'Share what you liked, and anything the host could improve...'}
-                      </Text>
-                    }
-                  />
-                </View>
+                <TextInput
+                  style={styles.reviewTextInput}
+                  value={comment}
+                  onChangeText={setComment}
+                  placeholder="Share what you liked, and anything the host could improve..."
+                  placeholderTextColor="#94a3b8"
+                  multiline={true}
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
 
                 {/* Terracotta Orange Submit Button */}
                 <TouchableOpacity
@@ -556,6 +553,16 @@ const styles = StyleSheet.create({
     minHeight: 90,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  reviewTextInput: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    fontSize: 13,
+    color: '#0f172a',
   },
   inputPlaceholderText: {
     fontSize: 13,
