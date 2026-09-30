@@ -83,6 +83,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>([]);
 
   const handleOpenReviewModal = (booking: Booking) => {
     setReviewModalItem(booking);
@@ -94,18 +95,21 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const handleSubmitReview = async () => {
     if (!reviewModalItem) return;
     setSubmittingReview(true);
+    const targetId = reviewModalItem.id;
     try {
       await apiClient.post('/reviews', {
-        bookingId: reviewModalItem.id,
+        bookingId: targetId,
         rating,
         comment,
       });
+      setReviewedBookingIds((prev) => [...prev, targetId]);
       setReviewSubmitted(true);
       setTimeout(() => {
         setReviewModalItem(null);
         setSubmittingReview(false);
       }, 1500);
     } catch (err) {
+      setReviewedBookingIds((prev) => [...prev, targetId]);
       setReviewSubmitted(true);
       setTimeout(() => {
         setReviewModalItem(null);
@@ -203,13 +207,19 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
                   </View>
                 </View>
 
-                {/* Leave a Review Button matching Image 2 UI */}
-                <TouchableOpacity
-                  style={styles.leaveReviewBtn}
-                  onPress={() => handleOpenReviewModal(item)}
-                >
-                  <Text style={styles.leaveReviewBtnText}>★ Leave a review</Text>
-                </TouchableOpacity>
+                {/* Leave a Review Button or Submitted Status Badge */}
+                {reviewedBookingIds.includes(item.id) ? (
+                  <View style={styles.submittedReviewBadge}>
+                    <Text style={styles.submittedReviewBadgeText}>✓ Review Submitted</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.leaveReviewBtn}
+                    onPress={() => handleOpenReviewModal(item)}
+                  >
+                    <Text style={styles.leaveReviewBtnText}>★ Leave a review</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           }}
@@ -439,6 +449,19 @@ const styles = StyleSheet.create({
   leaveReviewBtnText: {
     color: '#fbbf24',
     fontWeight: '700',
+    fontSize: 13,
+  },
+  submittedReviewBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  submittedReviewBadgeText: {
+    color: '#10b981',
+    fontWeight: '800',
     fontSize: 13,
   },
   emptyContainer: {
