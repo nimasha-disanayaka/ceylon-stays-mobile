@@ -18,6 +18,9 @@ interface MyTripsScreenProps {
   currentUser: any;
 }
 
+// Persistent global memory store across logins & app sessions
+let globalPersistentUserReviews: { [bookingId: string]: { rating: number; comment: string } } = {};
+
 export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   onBack,
   onOpenAuth,
@@ -43,21 +46,20 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       setBookings(fetchedBookings);
 
       // Extract reviews attached to bookings
-      const reviewedMap: { [bookingId: string]: { rating: number; comment: string } } = {};
       const reviewedIds: string[] = [];
 
       fetchedBookings.forEach((b: any) => {
         if (b.review) {
           reviewedIds.push(b.id);
-          reviewedMap[b.id] = {
+          globalPersistentUserReviews[b.id] = {
             rating: b.review.rating || 5,
             comment: b.review.comment || 'Beautiful stay, walking distance to the beach.',
           };
         }
       });
 
-      setReviewedBookingIds((prev) => Array.from(new Set([...prev, ...reviewedIds])));
-      setUserSubmittedReviews((prev) => ({ ...reviewedMap, ...prev }));
+      setReviewedBookingIds((prev) => Array.from(new Set([...prev, ...reviewedIds, ...Object.keys(globalPersistentUserReviews)])));
+      setUserSubmittedReviews({ ...globalPersistentUserReviews });
     } catch (err) {
       console.error('Failed to fetch traveler bookings:', err);
       // Fallback mock trip data if offline
@@ -101,13 +103,8 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>(['booking-1']);
-  const [userSubmittedReviews, setUserSubmittedReviews] = useState<{ [bookingId: string]: { rating: number; comment: string } }>({
-    'booking-1': {
-      rating: 5,
-      comment: 'Beautiful stay, walking distance to the beach, host was incredibly kind.',
-    },
-  });
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>(Object.keys(globalPersistentUserReviews));
+  const [userSubmittedReviews, setUserSubmittedReviews] = useState<{ [bookingId: string]: { rating: number; comment: string } }>(globalPersistentUserReviews);
 
   const handleOpenReviewModal = (booking: Booking) => {
     setReviewModalItem(booking);
@@ -135,11 +132,9 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
       console.warn('Review submission notice:', err);
     }
 
+    globalPersistentUserReviews[targetId] = { rating: finalRating, comment: finalComment };
     setReviewedBookingIds((prev) => Array.from(new Set([...prev, targetId])));
-    setUserSubmittedReviews((prev) => ({
-      ...prev,
-      [targetId]: { rating: finalRating, comment: finalComment },
-    }));
+    setUserSubmittedReviews({ ...globalPersistentUserReviews });
     setReviewSubmitted(true);
 
     setTimeout(() => {
