@@ -470,6 +470,11 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
               >
                 <Text style={styles.closeDetailsBtnText}>Close</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Moderate Cancellation Policy Breakdown Modal */}
       {cancelModalItem && (() => {
         const policy = calculateCancellationPolicy(cancelModalItem);
