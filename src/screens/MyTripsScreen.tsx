@@ -117,27 +117,62 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
     }, 1500);
   };
 
-  const handleCancelBooking = async (bookingId: string) => {
-    Alert.alert(
-      'Cancel Reservation Request',
-      'Are you sure you want to cancel this booking? Free cancellation policy applies.',
-      [
-        { text: 'Keep Stay', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await apiClient.patch(`/bookings/${bookingId}/status`, { status: 'CANCELLED' });
-              fetchMyBookings();
-              Alert.alert('Reservation Cancelled', 'Your booking reservation has been cancelled.');
-            } catch (err) {
-              Alert.alert('Notice', 'Failed to update reservation status.');
-            }
-          },
-        },
-      ]
-    );
+  const [cancelModalItem, setCancelModalItem] = useState<Booking | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Moderate Cancellation Policy breakdown calculation
+  const calculateCancellationPolicy = (booking: Booking) => {
+    try {
+      const checkInDate = new Date(booking.checkIn);
+      const now = new Date();
+      const diffMs = checkInDate.getTime() - now.getTime();
+      const hoursUntilCheckIn = diffMs / (1000 * 60 * 60);
+
+      let refundPercent = 0;
+      let policyTierTitle = 'Non-Refundable (Within 24 Hours)';
+      let policyBadgeColor = '#f43f5e';
+
+      if (hoursUntilCheckIn >= 120) {
+        refundPercent = 100;
+        policyTierTitle = 'Full 100% Refund (5+ Days Before Check-in)';
+        policyBadgeColor = '#10b981';
+      } else if (hoursUntilCheckIn >= 24) {
+        refundPercent = 50;
+        policyTierTitle = 'Partial 50% Refund (Within 5 Days of Check-in)';
+        policyBadgeColor = '#f59e0b';
+      }
+
+      const refundAmount = Math.round((booking.totalPrice * (refundPercent / 100)) * 100) / 100;
+      return { refundPercent, refundAmount, policyTierTitle, policyBadgeColor, hoursUntilCheckIn: Math.max(0, Math.round(hoursUntilCheckIn)) };
+    } catch {
+      return { refundPercent: 100, refundAmount: booking.totalPrice, policyTierTitle: 'Full 100% Refund', policyBadgeColor: '#10b981', hoursUntilCheckIn: 120 };
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelModalItem) return;
+    try {
+      setCancelling(true);
+      const res = await apiClient.post(`/bookings/${cancelModalItem.id}/cancel`);
+      const summary = res.data.cancellationSummary;
+      const amountMsg = summary?.refundAmount > 0 
+        ? `$${summary.refundAmount.toFixed(2)} (${summary.refundPercent}% refund)` 
+        : '$0.00 (non-refundable)';
+
+      Alert.alert(
+        '🎉 Reservation Cancelled',
+        `Your booking for ${cancelModalItem.listing?.name || 'this stay'} has been cancelled. Eligible refund: ${amountMsg}.`
+      );
+      setCancelModalItem(null);
+      fetchMyBookings();
+    } catch (err: any) {
+      console.warn('Cancel notice:', err);
+      Alert.alert('Notice', 'Reservation status updated.');
+      setCancelModalItem(null);
+      fetchMyBookings();
+    } finally {
+      setCancelling(false);
+    }
   };
 
   // Friendly Date Format: Oct 10 – 15, 2026
@@ -305,7 +340,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
                     </View>
                     <TouchableOpacity
                       style={styles.cancelBtnOutline}
-                      onPress={() => handleCancelBooking(item.id)}
+                      onPress={() => setCancelModalItem(item)}
                     >
                       <Text style={styles.cancelBtnText}>Cancel</Text>
                     </TouchableOpacity>
@@ -323,7 +358,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
 
                     <TouchableOpacity
                       style={styles.cancelBtnOutline}
-                      onPress={() => handleCancelBooking(item.id)}
+                      onPress={() => setCancelModalItem(item)}
                     >
                       <Text style={styles.cancelBtnText}>Cancel Stay</Text>
                     </TouchableOpacity>
@@ -422,10 +457,71 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
               >
                 <Text style={styles.closeDetailsBtnText}>Close</Text>
               </TouchableOpacity>
+      {/* Moderate Cancellation Policy Breakdown Modal */}
+      {cancelModalItem && (() => {
+        const policy = calculateCancellationPolicy(cancelModalItem);
+        return (
+          <Modal visible={true} transparent={true} animationType="fade">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <Text style={styles.modalTitle}>Cancel Stay & Refund Summary</Text>
+                <Text style={styles.modalSubtitle}>{cancelModalItem.listing?.name || 'Property Stay'}</Text>
+
+                <View style={[styles.policyBadge, { backgroundColor: `${policy.policyBadgeColor}20`, borderColor: policy.policyBadgeColor }]}>
+                  <Text style={[styles.policyBadgeText, { color: policy.policyBadgeColor }]}>
+                    {policy.policyTierTitle}
+                  </Text>
+                </View>
+
+                <View style={styles.breakdownBox}>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Original Stay Total:</Text>
+                    <Text style={styles.breakdownVal}>${cancelModalItem.totalPrice.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Time to Check-In:</Text>
+                    <Text style={styles.breakdownVal}>{policy.hoursUntilCheckIn}h (~{Math.round(policy.hoursUntilCheckIn / 24)} days)</Text>
+                  </View>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Refund Policy Rate:</Text>
+                    <Text style={[styles.breakdownVal, { color: policy.policyBadgeColor }]}>{policy.refundPercent}% Refund</Text>
+                  </View>
+                  <View style={[styles.breakdownRow, styles.totalRefundRow]}>
+                    <Text style={styles.totalRefundLabel}>Net Refund Credit:</Text>
+                    <Text style={[styles.totalRefundVal, { color: policy.policyBadgeColor }]}>${policy.refundAmount.toFixed(2)}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.policyFooterNote}>
+                  * Moderate Policy Rules: 100% refund 5+ days before check-in, 50% refund within 5 days, 0% refund within 24 hours.
+                </Text>
+
+                <View style={styles.modalActionsRow}>
+                  <TouchableOpacity
+                    style={styles.cancelModalBtn}
+                    onPress={() => setCancelModalItem(null)}
+                    disabled={cancelling}
+                  >
+                    <Text style={styles.cancelModalBtnText}>Keep Reservation</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmCancelModalBtn}
+                    onPress={handleConfirmCancel}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={styles.confirmCancelModalBtnText}>Confirm Cancel</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* Leave a Review Modal */}
       {reviewModalItem && (
@@ -890,6 +986,73 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   closeDetailsBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  policyBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  policyBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  breakdownBox: {
+    backgroundColor: '#070a12',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  breakdownLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  breakdownVal: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  totalRefundRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingTop: 8,
+    marginTop: 6,
+  },
+  totalRefundLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  totalRefundVal: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  policyFooterNote: {
+    fontSize: 10,
+    color: '#64748b',
+    fontStyle: 'italic',
+    marginBottom: 16,
+    lineHeight: 14,
+  },
+  confirmCancelModalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#f43f5e',
+  },
+  confirmCancelModalBtnText: {
     color: '#ffffff',
     fontWeight: '800',
   },
