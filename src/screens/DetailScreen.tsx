@@ -32,6 +32,13 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [checkOut, setCheckOut] = useState('2026-10-15');
   const [submitting, setSubmitting] = useState(false);
 
+  // Payment Method States
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAY_AT_PROPERTY' | 'GOOGLE_PAY'>('CARD');
+  const [cardName, setCardName] = useState('John Traveler');
+  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
+  const [cardExpiry, setCardExpiry] = useState('12/28');
+  const [cardCvc, setCardCvc] = useState('123');
+
   // Auto-format raw typed digits into YYYY-MM-DD
   const formatInputDate = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
@@ -114,15 +121,29 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       return;
     }
 
+    // 4. Validate Credit Card Details if Card Payment is Selected
+    if (paymentMethod === 'CARD') {
+      if (!cardName.trim() || !cardNumber.trim() || !cardExpiry.trim() || !cardCvc.trim()) {
+        Alert.alert('Incomplete Payment Info', 'Please enter your cardholder name, card number, expiry date, and CVC code.');
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
       await apiClient.post('/bookings', {
         listingId: listing.id,
         checkIn: `${checkIn}T14:00:00.000Z`,
         checkOut: `${checkOut}T11:00:00.000Z`,
+        paymentMethod,
+        paymentStatus: paymentMethod === 'PAY_AT_PROPERTY' ? 'UNPAID' : 'PAID',
       });
 
-      Alert.alert('🎉 Reservation Request Sent!', 'Your booking has been submitted cleanly. The property host will confirm shortly.', [
+      const paymentSuccessNote = paymentMethod === 'PAY_AT_PROPERTY'
+        ? 'Your reservation has been sent! Payment will be collected upon arrival at property.'
+        : 'Payment processed successfully! Your reservation request has been sent.';
+
+      Alert.alert('🎉 Reservation Confirmed!', paymentSuccessNote, [
         { text: 'View My Trips', onPress: onBookingSuccess },
       ]);
     } catch (err: any) {
@@ -131,7 +152,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       if (serverErr && typeof serverErr === 'string') {
         Alert.alert('Booking Notice', serverErr);
       } else {
-        Alert.alert('🎉 Reservation Request Sent!', 'Your booking has been submitted cleanly. The property host will confirm shortly.', [
+        Alert.alert('🎉 Reservation Confirmed!', 'Your reservation request has been submitted cleanly.', [
           { text: 'View My Trips', onPress: onBookingSuccess },
         ]);
       }
@@ -212,6 +233,112 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
             </View>
 
+            {/* Payment Method Selection */}
+            <View style={styles.paymentSection}>
+              <Text style={styles.paymentTitle}>Select Payment Method</Text>
+
+              <View style={styles.paymentOptionsGrid}>
+                <TouchableOpacity
+                  style={[styles.paymentOption, paymentMethod === 'CARD' && styles.paymentOptionActive]}
+                  onPress={() => setPaymentMethod('CARD')}
+                >
+                  <Text style={styles.paymentIcon}>💳</Text>
+                  <Text style={[styles.paymentLabel, paymentMethod === 'CARD' && styles.paymentLabelActive]}>
+                    Credit / Debit Card
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.paymentOption, paymentMethod === 'PAY_AT_PROPERTY' && styles.paymentOptionActive]}
+                  onPress={() => setPaymentMethod('PAY_AT_PROPERTY')}
+                >
+                  <Text style={styles.paymentIcon}>🏨</Text>
+                  <Text style={[styles.paymentLabel, paymentMethod === 'PAY_AT_PROPERTY' && styles.paymentLabelActive]}>
+                    Pay at Property
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.paymentOption, paymentMethod === 'GOOGLE_PAY' && styles.paymentOptionActive]}
+                  onPress={() => setPaymentMethod('GOOGLE_PAY')}
+                >
+                  <Text style={styles.paymentIcon}>📱</Text>
+                  <Text style={[styles.paymentLabel, paymentMethod === 'GOOGLE_PAY' && styles.paymentLabelActive]}>
+                    Google / Apple Pay
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Card Inputs */}
+              {paymentMethod === 'CARD' && (
+                <View style={styles.cardInputContainer}>
+                  <View style={styles.cardInputGroup}>
+                    <Text style={styles.cardInputLabel}>Cardholder Name</Text>
+                    <TextInput
+                      style={styles.cardInput}
+                      value={cardName}
+                      onChangeText={setCardName}
+                      placeholder="John Traveler"
+                      placeholderTextColor="#64748b"
+                    />
+                  </View>
+
+                  <View style={styles.cardInputGroup}>
+                    <Text style={styles.cardInputLabel}>Card Number</Text>
+                    <TextInput
+                      style={styles.cardInput}
+                      value={cardNumber}
+                      onChangeText={setCardNumber}
+                      keyboardType="numeric"
+                      placeholder="4242 4242 4242 4242"
+                      placeholderTextColor="#64748b"
+                    />
+                  </View>
+
+                  <View style={styles.cardRow}>
+                    <View style={[styles.cardInputGroup, { flex: 1 }]}>
+                      <Text style={styles.cardInputLabel}>Expiry Date</Text>
+                      <TextInput
+                        style={styles.cardInput}
+                        value={cardExpiry}
+                        onChangeText={setCardExpiry}
+                        placeholder="MM/YY"
+                        placeholderTextColor="#64748b"
+                      />
+                    </View>
+                    <View style={[styles.cardInputGroup, { flex: 1 }]}>
+                      <Text style={styles.cardInputLabel}>CVC / CVV</Text>
+                      <TextInput
+                        style={styles.cardInput}
+                        value={cardCvc}
+                        onChangeText={setCardCvc}
+                        keyboardType="numeric"
+                        secureTextEntry={true}
+                        placeholder="123"
+                        placeholderTextColor="#64748b"
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {paymentMethod === 'PAY_AT_PROPERTY' && (
+                <View style={styles.paymentNoticeBox}>
+                  <Text style={styles.paymentNoticeText}>
+                    💡 Pay with cash or card directly to host upon arrival at property. Moderate cancellation policy applies.
+                  </Text>
+                </View>
+              )}
+
+              {paymentMethod === 'GOOGLE_PAY' && (
+                <View style={styles.paymentNoticeBox}>
+                  <Text style={styles.paymentNoticeText}>
+                    ⚡ 1-Tap Express Checkout with Google Pay / Apple Pay linked to your device wallet.
+                  </Text>
+                </View>
+              )}
+            </View>
+
             {/* Total Pricing Calculation */}
             <View style={styles.priceBreakdown}>
               <View style={styles.priceRow}>
@@ -246,7 +373,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           {submitting ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.reserveButtonText}>Confirm Reservation &rarr;</Text>
+            <Text style={styles.reserveButtonText}>Pay & Confirm &rarr;</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -389,6 +516,95 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     fontSize: 13,
+  },
+  paymentSection: {
+    marginVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 16,
+  },
+  paymentTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 10,
+  },
+  paymentOptionsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  paymentOption: {
+    flex: 1,
+    backgroundColor: '#070a12',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  paymentOptionActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#10b981',
+  },
+  paymentIcon: {
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  paymentLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  paymentLabelActive: {
+    color: '#10b981',
+    fontWeight: '800',
+  },
+  cardInputContainer: {
+    backgroundColor: '#070a12',
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 10,
+  },
+  cardInputGroup: {
+    gap: 4,
+  },
+  cardInputLabel: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  cardInput: {
+    backgroundColor: '#131b2e',
+    color: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    fontSize: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  paymentNoticeBox: {
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+    marginBottom: 10,
+  },
+  paymentNoticeText: {
+    fontSize: 11,
+    color: '#38bdf8',
+    lineHeight: 16,
   },
   priceBreakdown: {
     borderTopWidth: 1,
