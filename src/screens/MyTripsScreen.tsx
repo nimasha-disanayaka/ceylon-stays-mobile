@@ -23,7 +23,7 @@ interface MyTripsScreenProps {
 }
 
 // Global review memory
-let globalPersistentUserReviews: { [bookingId: string]: { rating: number; comment: string } } = {};
+let globalPersistentUserReviews: { [bookingId: string]: { rating: number; comment: string; reply?: string } } = {};
 
 export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   onBack,
@@ -57,6 +57,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
           globalPersistentUserReviews[b.id] = {
             rating: b.review.rating || 5,
             comment: b.review.comment || 'Beautiful stay, walking distance to the beach.',
+            reply: b.review.reply || b.review.hostReply,
           };
         }
       });
@@ -78,7 +79,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>(Object.keys(globalPersistentUserReviews));
-  const [userSubmittedReviews, setUserSubmittedReviews] = useState<{ [bookingId: string]: { rating: number; comment: string } }>(globalPersistentUserReviews);
+  const [userSubmittedReviews, setUserSubmittedReviews] = useState<{ [bookingId: string]: { rating: number; comment: string; reply?: string } }>(globalPersistentUserReviews);
 
   const handleOpenReviewModal = (booking: Booking) => {
     setReviewModalItem(booking);
