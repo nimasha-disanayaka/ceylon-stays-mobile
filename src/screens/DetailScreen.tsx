@@ -33,7 +33,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   // Payment Method States
-  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAY_AT_PROPERTY' | 'GOOGLE_PAY'>('CARD');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAY_AT_PROPERTY'>('CARD');
   const [cardName, setCardName] = useState('John Traveler');
   const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
   const [cardExpiry, setCardExpiry] = useState('12/28');
@@ -257,16 +257,6 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                     Pay at Property
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.paymentOption, paymentMethod === 'GOOGLE_PAY' && styles.paymentOptionActive]}
-                  onPress={() => setPaymentMethod('GOOGLE_PAY')}
-                >
-                  <Text style={styles.paymentIcon}>📱</Text>
-                  <Text style={[styles.paymentLabel, paymentMethod === 'GOOGLE_PAY' && styles.paymentLabelActive]}>
-                    Google / Apple Pay
-                  </Text>
-                </TouchableOpacity>
               </View>
 
               {/* Card Inputs */}
@@ -326,14 +316,6 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                 <View style={styles.paymentNoticeBox}>
                   <Text style={styles.paymentNoticeText}>
                     💡 Pay with cash or card directly to host upon arrival at property. Moderate cancellation policy applies.
-                  </Text>
-                </View>
-              )}
-
-              {paymentMethod === 'GOOGLE_PAY' && (
-                <View style={styles.paymentNoticeBox}>
-                  <Text style={styles.paymentNoticeText}>
-                    ⚡ 1-Tap Express Checkout with Google Pay / Apple Pay linked to your device wallet.
                   </Text>
                 </View>
               )}
