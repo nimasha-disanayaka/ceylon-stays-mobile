@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Listing, User } from '../types';
 import { apiClient } from '../api/client';
+import { CalendarModal } from '../components/CalendarModal';
 
 interface DetailScreenProps {
   listing: Listing;
@@ -31,6 +32,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [checkIn, setCheckIn] = useState('2026-10-10');
   const [checkOut, setCheckOut] = useState('2026-10-15');
   const [submitting, setSubmitting] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
 
   // Availability States
   const [unavailableRanges, setUnavailableRanges] = useState<Array<{ startDate: string; endDate: string; type: string; reason?: string }>>([]);
@@ -286,9 +288,27 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
             )}
 
+            {/* Visual Calendar Date Picker Trigger Button */}
+            <TouchableOpacity
+              style={styles.openCalendarBtn}
+              onPress={() => setShowCalendarModal(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.openCalendarBtnIcon}>📅</Text>
+              <View style={styles.openCalendarBtnTextContainer}>
+                <Text style={styles.openCalendarBtnTitle}>Interactive Visual Calendar</Text>
+                <Text style={styles.openCalendarBtnSubtitle}>Tap to pick available dates on live monthly grid</Text>
+              </View>
+              <Text style={styles.openCalendarBtnArrow}>→</Text>
+            </TouchableOpacity>
+
             <View style={styles.datesRow}>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>Check-In Date</Text>
+              <TouchableOpacity
+                style={styles.dateField}
+                activeOpacity={0.8}
+                onPress={() => setShowCalendarModal(true)}
+              >
+                <Text style={styles.dateLabel}>Check-In Date 📅</Text>
                 <TextInput
                   style={[styles.dateInput, collisionWarning ? styles.dateInputError : null]}
                   value={checkIn}
@@ -296,9 +316,13 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#64748b"
                 />
-              </View>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>Check-Out Date</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dateField}
+                activeOpacity={0.8}
+                onPress={() => setShowCalendarModal(true)}
+              >
+                <Text style={styles.dateLabel}>Check-Out Date 📅</Text>
                 <TextInput
                   style={[styles.dateInput, collisionWarning ? styles.dateInputError : null]}
                   value={checkOut}
@@ -306,7 +330,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#64748b"
                 />
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Payment Method Selection */}
@@ -435,6 +459,18 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           )}
         </TouchableOpacity>
       </View>
+      {/* Visual Calendar Modal */}
+      <CalendarModal
+        visible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        initialCheckIn={checkIn}
+        initialCheckOut={checkOut}
+        unavailableRanges={unavailableRanges}
+        onSelectDates={(inDate, outDate) => {
+          setCheckIn(inDate);
+          setCheckOut(outDate);
+        }}
+      />
     </View>
   );
 };
@@ -795,5 +831,39 @@ const styles = StyleSheet.create({
   dateInputError: {
     borderColor: '#ef4444',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  openCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    gap: 12,
+  },
+  openCalendarBtnIcon: {
+    fontSize: 22,
+  },
+  openCalendarBtnTextContainer: {
+    flex: 1,
+  },
+  openCalendarBtnTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#10b981',
+    letterSpacing: 0.3,
+  },
+  openCalendarBtnSubtitle: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  openCalendarBtnArrow: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10b981',
   },
 });
