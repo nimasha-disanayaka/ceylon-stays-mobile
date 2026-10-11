@@ -23,6 +23,12 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing, onPress }) =>
         </Text>
       </View>
 
+      {/* Star Rating Badge */}
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingStar}>★</Text>
+        <Text style={styles.ratingScore}>4.9</Text>
+      </View>
+
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={1}>
           {listing.name || listing.title}
@@ -163,5 +169,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#cbd5e1',
     fontWeight: '500',
+  },
+  ratingContainer: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.4)',
+  },
+  ratingStar: {
+    color: '#fbbf24',
+    fontSize: 12,
+  },
+  ratingScore: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

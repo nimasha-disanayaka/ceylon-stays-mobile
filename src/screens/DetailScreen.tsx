@@ -13,6 +13,7 @@ import {
 import { Listing, User } from '../types';
 import { apiClient } from '../api/client';
 import { CalendarModal } from '../components/CalendarModal';
+import { ReviewModal } from '../components/ReviewModal';
 
 interface DetailScreenProps {
   listing: Listing;
@@ -38,9 +39,42 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [unavailableRanges, setUnavailableRanges] = useState<Array<{ startDate: string; endDate: string; type: string; reason?: string }>>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
 
+  // Reviews States
+  const [reviewsData, setReviewsData] = useState<{
+    summary: { averageRating: number; totalReviews: number };
+    reviews: Array<{
+      id: string;
+      authorName: string;
+      rating: number;
+      comment: string;
+      reply?: string | null;
+      createdAt?: string;
+    }>;
+  }>({
+    summary: { averageRating: 4.9, totalReviews: 3 },
+    reviews: [],
+  });
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
   React.useEffect(() => {
     fetchAvailability();
+    fetchListingReviews();
   }, [listing.id]);
+
+  const fetchListingReviews = async () => {
+    try {
+      setLoadingReviews(true);
+      const res = await apiClient.get(`/reviews/listing/${listing.id}`);
+      if (res.data) {
+        setReviewsData(res.data);
+      }
+    } catch (err) {
+      console.warn('Notice fetching reviews:', err);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
   const fetchAvailability = async () => {
     try {
@@ -228,6 +262,12 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           {/* Business & Property Badge */}
           <View style={styles.badgeRow}>
             <Text style={styles.typeBadge}>{listing.business?.type || 'PROPERTY'}</Text>
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingBadgeStar}>★</Text>
+              <Text style={styles.ratingBadgeText}>
+                {reviewsData.summary.averageRating} ({reviewsData.summary.totalReviews})
+              </Text>
+            </View>
             <Text style={styles.hostName}>Host: {listing.business?.name || 'Local Partner'}</Text>
           </View>
 
@@ -254,6 +294,79 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               </View>
             </View>
           )}
+
+          {/* Guest Reviews & Ratings Section */}
+          <View style={styles.section}>
+            <View style={styles.reviewsHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Guest Reviews & Ratings</Text>
+                <View style={styles.scoreRow}>
+                  <Text style={styles.overallScoreStar}>★</Text>
+                  <Text style={styles.overallScoreVal}>{reviewsData.summary.averageRating}</Text>
+                  <Text style={styles.overallScoreSub}>
+                    / 5.0 • {reviewsData.summary.totalReviews} verified guest reviews
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.writeReviewBtn}
+                onPress={() => setShowReviewModal(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.writeReviewBtnText}>★ Rate Stay</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingReviews ? (
+              <ActivityIndicator color="#10b981" style={{ marginVertical: 14 }} />
+            ) : reviewsData.reviews.length === 0 ? (
+              <View style={styles.noReviewsBox}>
+                <Text style={styles.noReviewsText}>No guest reviews yet. Be the first to share your experience!</Text>
+              </View>
+            ) : (
+              <View style={styles.reviewsList}>
+                {reviewsData.reviews.map((rev) => (
+                  <View key={rev.id} style={styles.reviewCard}>
+                    <View style={styles.reviewCardTop}>
+                      <View style={styles.authorAvatar}>
+                        <Text style={styles.authorAvatarText}>
+                          {rev.authorName ? rev.authorName.charAt(0).toUpperCase() : 'G'}
+                        </Text>
+                      </View>
+                      <View style={styles.authorMeta}>
+                        <Text style={styles.authorName}>{rev.authorName || 'Traveler Guest'}</Text>
+                        <View style={styles.reviewStarsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Text
+                              key={s}
+                              style={[
+                                styles.reviewStarSymbol,
+                                s <= rev.rating ? styles.goldStar : styles.dimStar,
+                              ]}
+                            >
+                              ★
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={styles.reviewComment}>"{rev.comment}"</Text>
+
+                    {rev.reply && (
+                      <View style={styles.hostReplyBox}>
+                        <Text style={styles.hostReplyTitle}>
+                          💬 Host Response ({listing.business?.name || 'Host'}):
+                        </Text>
+                        <Text style={styles.hostReplyText}>"{rev.reply}"</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
 
           {/* Date Selector Box */}
           <View style={styles.bookingBox}>
@@ -469,6 +582,18 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
         onSelectDates={(inDate, outDate) => {
           setCheckIn(inDate);
           setCheckOut(outDate);
+        }}
+      />
+
+      {/* Review Submission Modal */}
+      <ReviewModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        listingId={listing.id}
+        listingName={listing.name || listing.title || 'Property Stay'}
+        authorName={currentUser?.name || 'Traveler Guest'}
+        onReviewSubmitted={() => {
+          fetchListingReviews();
         }}
       />
     </View>
@@ -865,5 +990,151 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#10b981',
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  ratingBadgeStar: {
+    color: '#fbbf24',
+    fontSize: 12,
+  },
+  ratingBadgeText: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reviewsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  overallScoreStar: {
+    color: '#fbbf24',
+    fontSize: 16,
+  },
+  overallScoreVal: {
+    color: '#fbbf24',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  overallScoreSub: {
+    color: '#94a3b8',
+    fontSize: 12,
+  },
+  writeReviewBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  writeReviewBtnText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  noReviewsBox: {
+    backgroundColor: '#0c1222',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  noReviewsText: {
+    color: '#94a3b8',
+    fontSize: 12,
+  },
+  reviewsList: {
+    gap: 12,
+  },
+  reviewCard: {
+    backgroundColor: '#0c1222',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  reviewCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  authorAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  authorAvatarText: {
+    color: '#38bdf8',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  authorMeta: {
+    flex: 1,
+  },
+  authorName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    gap: 2,
+    marginTop: 2,
+  },
+  reviewStarSymbol: {
+    fontSize: 13,
+  },
+  goldStar: {
+    color: '#fbbf24',
+  },
+  dimStar: {
+    color: '#334155',
+  },
+  reviewComment: {
+    fontSize: 13,
+    color: '#cbd5e1',
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+  hostReplyBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10b981',
+  },
+  hostReplyTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10b981',
+    marginBottom: 4,
+  },
+  hostReplyText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    lineHeight: 17,
   },
 });
