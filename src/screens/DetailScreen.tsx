@@ -32,6 +32,52 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [checkOut, setCheckOut] = useState('2026-10-15');
   const [submitting, setSubmitting] = useState(false);
 
+  // Availability States
+  const [unavailableRanges, setUnavailableRanges] = useState<Array<{ startDate: string; endDate: string; type: string; reason?: string }>>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  React.useEffect(() => {
+    fetchAvailability();
+  }, [listing.id]);
+
+  const fetchAvailability = async () => {
+    try {
+      setLoadingAvailability(true);
+      const res = await apiClient.get(`/listings/${listing.id}/availability`);
+      if (res.data && res.data.unavailableRanges) {
+        setUnavailableRanges(res.data.unavailableRanges);
+      }
+    } catch (err) {
+      console.warn('Notice fetching listing availability:', err);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const getCollisionWarning = (inStr: string, outStr: string) => {
+    try {
+      const targetIn = new Date(inStr);
+      const targetOut = new Date(outStr);
+
+      if (isNaN(targetIn.getTime()) || isNaN(targetOut.getTime())) return null;
+
+      for (const range of unavailableRanges) {
+        const rangeIn = new Date(range.startDate);
+        const rangeOut = new Date(range.endDate);
+
+        if (targetIn < rangeOut && targetOut > rangeIn) {
+          const typeLabel = range.type === 'BLOCKED_BY_HOST' ? 'host maintenance block' : 'existing reservation';
+          return `⚠️ Dates (${inStr} to ${outStr}) overlap with an ${typeLabel} (${range.startDate} → ${range.endDate}). Please select available dates.`;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const collisionWarning = getCollisionWarning(checkIn, checkOut);
+
   // Payment Method States
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAY_AT_PROPERTY'>('CARD');
   const [cardName, setCardName] = useState('John Traveler');
@@ -210,11 +256,41 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           {/* Date Selector Box */}
           <View style={styles.bookingBox}>
             <Text style={styles.sectionTitle}>Select Dates & Stay</Text>
+
+            {/* Reserved / Unavailable Dates Display */}
+            <View style={styles.unavailableDatesContainer}>
+              <View style={styles.unavailableHeaderRow}>
+                <Text style={styles.unavailableHeaderTitle}>📅 Reserved & Unavailable Dates</Text>
+                {loadingAvailability && <ActivityIndicator size="small" color="#10b981" />}
+              </View>
+
+              {unavailableRanges.length === 0 ? (
+                <Text style={styles.allAvailableText}>✨ All dates currently available for booking!</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rangesScroll}>
+                  {unavailableRanges.map((range, idx) => (
+                    <View key={idx} style={styles.rangeBadge}>
+                      <Text style={styles.rangeBadgeText}>
+                        🔒 {range.startDate} → {range.endDate} ({range.type === 'BLOCKED_BY_HOST' ? 'Blocked' : 'Reserved'})
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Date Collision Warning Banner */}
+            {collisionWarning && (
+              <View style={styles.collisionBanner}>
+                <Text style={styles.collisionBannerText}>{collisionWarning}</Text>
+              </View>
+            )}
+
             <View style={styles.datesRow}>
               <View style={styles.dateField}>
                 <Text style={styles.dateLabel}>Check-In Date</Text>
                 <TextInput
-                  style={styles.dateInput}
+                  style={[styles.dateInput, collisionWarning ? styles.dateInputError : null]}
                   value={checkIn}
                   onChangeText={handleCheckInChange}
                   placeholder="YYYY-MM-DD"
@@ -224,7 +300,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
               <View style={styles.dateField}>
                 <Text style={styles.dateLabel}>Check-Out Date</Text>
                 <TextInput
-                  style={styles.dateInput}
+                  style={[styles.dateInput, collisionWarning ? styles.dateInputError : null]}
                   value={checkOut}
                   onChangeText={handleCheckOutChange}
                   placeholder="YYYY-MM-DD"
@@ -660,5 +736,64 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
+  },
+  unavailableDatesContainer: {
+    backgroundColor: '#070a12',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  unavailableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  unavailableHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  allAvailableText: {
+    fontSize: 11,
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  rangesScroll: {
+    flexDirection: 'row',
+  },
+  rangeBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  rangeBadgeText: {
+    fontSize: 11,
+    color: '#f87171',
+    fontWeight: '700',
+  },
+  collisionBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 14,
+  },
+  collisionBannerText: {
+    color: '#fca5a5',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  dateInputError: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
 });
