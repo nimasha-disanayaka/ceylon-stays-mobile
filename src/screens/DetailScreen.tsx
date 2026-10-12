@@ -275,7 +275,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             }}
             scrollEventThrottle={16}
           >
-            {images.map((imgUri, idx) => (
+            {images.map((imgUri: string, idx: number) => (
               <Image key={idx} source={{ uri: imgUri }} style={styles.carouselImage} />
             ))}
           </ScrollView>

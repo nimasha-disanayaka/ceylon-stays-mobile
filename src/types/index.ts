@@ -8,6 +8,7 @@ export interface Business {
   longitude?: number;
   phone?: string;
   email?: string;
+  imageUrls?: string[];
 }
 
 export interface Listing {
@@ -32,6 +33,7 @@ export interface Booking {
   totalNights: number;
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  paymentStatus?: 'PAID' | 'UNPAID' | 'REFUNDED' | 'RELEASED' | string;
   listing?: Listing;
   createdAt: string;
 }
