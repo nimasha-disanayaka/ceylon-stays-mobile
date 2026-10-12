@@ -33,9 +33,17 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   onBookingSuccess,
   onOpenAuth,
 }) => {
+  const getTodayFormatted = (offsetDays = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  };
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [checkIn, setCheckIn] = useState('2026-10-10');
-  const [checkOut, setCheckOut] = useState('2026-10-15');
+  const [checkIn, setCheckIn] = useState(getTodayFormatted(0));
+  const [checkOut, setCheckOut] = useState(getTodayFormatted(4));
   const [submitting, setSubmitting] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
@@ -157,6 +165,11 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       return `Invalid Day (${parts[2]}) in ${fieldName}. Month ${parts[1]} has maximum ${maxDays} days.`;
     }
 
+    const todayStr = getTodayFormatted(0);
+    if (dateStr < todayStr) {
+      return `${fieldName} cannot be in the past (${dateStr}). Today is ${todayStr}.`;
+    }
+
     return null;
   };
 
@@ -199,6 +212,12 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       return;
     }
 
+    const todayStr = getTodayFormatted(0);
+    if (checkIn < todayStr) {
+      Alert.alert('Past Date Selected', `Check-In Date cannot be in the past. Today is ${todayStr}.`);
+      return;
+    }
+
     // 3. Verify Check-Out > Check-In
     const inDate = new Date(checkIn);
     const outDate = new Date(checkOut);
@@ -207,7 +226,18 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       return;
     }
 
-    // 4. Validate Credit Card Details if Card Payment is Selected
+    // 4. Verify no overlap with booked or blocked dates
+    for (const range of unavailableRanges) {
+      if (checkIn < range.endDate && checkOut > range.startDate) {
+        Alert.alert(
+          'Dates Unavailable',
+          `The selected range (${checkIn} to ${checkOut}) conflicts with unavailable dates (${range.startDate} to ${range.endDate}). Please select free dates from the calendar.`
+        );
+        return;
+      }
+    }
+
+    // 5. Validate Credit Card Details if Card Payment is Selected
     if (paymentMethod === 'CARD') {
       if (!cardName.trim() || !cardNumber.trim() || !cardExpiry.trim() || !cardCvc.trim()) {
         Alert.alert('Incomplete Payment Info', 'Please enter your cardholder name, card number, expiry date, and CVC code.');

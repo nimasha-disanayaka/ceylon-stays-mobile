@@ -32,17 +32,28 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
   initialCheckOut,
   unavailableRanges,
 }) => {
-  // Parse initial check-in date for default calendar view month
-  const initialDate = initialCheckIn ? new Date(initialCheckIn) : new Date();
-  const [currentYear, setCurrentYear] = useState(
-    isNaN(initialDate.getFullYear()) ? 2026 : initialDate.getFullYear()
-  );
-  const [currentMonth, setCurrentMonth] = useState(
-    isNaN(initialDate.getMonth()) ? 9 : initialDate.getMonth()
-  ); // 0-indexed (9 = October)
+  // Today reference to prevent selecting past dates
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  const [selectedIn, setSelectedIn] = useState<string>(initialCheckIn || '');
-  const [selectedOut, setSelectedOut] = useState<string>(initialCheckOut || '');
+  // Parse initial check-in date for default calendar view month (never before today's month)
+  const initialDate = initialCheckIn ? new Date(initialCheckIn) : now;
+  const initialYear = isNaN(initialDate.getFullYear()) || initialDate.getFullYear() < now.getFullYear()
+    ? now.getFullYear()
+    : initialDate.getFullYear();
+  const initialMonth = isNaN(initialDate.getMonth()) || (initialYear === now.getFullYear() && initialDate.getMonth() < now.getMonth())
+    ? now.getMonth()
+    : initialDate.getMonth();
+
+  const [currentYear, setCurrentYear] = useState(initialYear);
+  const [currentMonth, setCurrentMonth] = useState(initialMonth);
+
+  const [selectedIn, setSelectedIn] = useState<string>(
+    initialCheckIn && initialCheckIn >= todayStr ? initialCheckIn : todayStr
+  );
+  const [selectedOut, setSelectedOut] = useState<string>(
+    initialCheckOut && initialCheckOut > (initialCheckIn || todayStr) ? initialCheckOut : ''
+  );
 
   // Helper to format date as YYYY-MM-DD
   const formatDateStr = (year: number, month: number, day: number) => {
@@ -51,8 +62,13 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
     return `${year}-${m}-${d}`;
   };
 
-  // Month navigation
+  // Month navigation guards: disallow viewing months in the past
+  const isAtCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
+  const isBeforeCurrentMonth =
+    currentYear < now.getFullYear() || (currentYear === now.getFullYear() && currentMonth < now.getMonth());
+
   const handlePrevMonth = () => {
+    if (isAtCurrentMonth || isBeforeCurrentMonth) return;
     if (currentMonth === 0) {
       setCurrentMonth(11);
       setCurrentYear((prev) => prev - 1);
@@ -100,6 +116,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 
   // Day click handler
   const handleDayPress = (dateStr: string) => {
+    if (dateStr < todayStr) return;
     if (isDateBooked(dateStr)) return;
 
     if (!selectedIn || (selectedIn && selectedOut)) {
@@ -178,8 +195,12 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 
           {/* Month Navigation */}
           <View style={styles.monthNavRow}>
-            <TouchableOpacity onPress={handlePrevMonth} style={styles.navArrowBtn}>
-              <Text style={styles.navArrowText}>‹</Text>
+            <TouchableOpacity
+              disabled={isAtCurrentMonth}
+              onPress={handlePrevMonth}
+              style={[styles.navArrowBtn, isAtCurrentMonth && styles.navArrowBtnDisabled]}
+            >
+              <Text style={[styles.navArrowText, isAtCurrentMonth && styles.navArrowTextDisabled]}>‹</Text>
             </TouchableOpacity>
             <Text style={styles.monthTitle}>
               {MONTH_NAMES[currentMonth]} {currentYear}
@@ -210,6 +231,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               const dayNum = idx + 1;
               const dateStr = formatDateStr(currentYear, currentMonth, dayNum);
               const booked = isDateBooked(dateStr);
+              const isPast = dateStr < todayStr;
               const isStart = selectedIn === dateStr;
               const isEnd = selectedOut === dateStr;
               const inRange =
@@ -218,10 +240,11 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               return (
                 <TouchableOpacity
                   key={`day-${dayNum}`}
-                  disabled={booked}
+                  disabled={booked || isPast}
                   onPress={() => handleDayPress(dateStr)}
                   style={[
                     styles.dayCell,
+                    isPast && styles.dayCellPast,
                     booked && styles.dayCellBooked,
                     inRange && styles.dayCellInRange,
                     (isStart || isEnd) && styles.dayCellSelected,
@@ -230,6 +253,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                   <Text
                     style={[
                       styles.dayText,
+                      isPast && styles.dayTextPast,
                       booked && styles.dayTextBooked,
                       inRange && styles.dayTextInRange,
                       (isStart || isEnd) && styles.dayTextSelected,
@@ -391,11 +415,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  navArrowBtnDisabled: {
+    opacity: 0.25,
+    backgroundColor: '#0f172a',
+  },
   navArrowText: {
     color: '#ffffff',
     fontSize: 22,
     fontWeight: '700',
     lineHeight: 24,
+  },
+  navArrowTextDisabled: {
+    color: '#475569',
   },
   monthTitle: {
     color: '#38bdf8',
@@ -433,6 +464,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 10,
     marginVertical: 2,
+  },
+  dayCellPast: {
+    opacity: 0.35,
+    backgroundColor: 'transparent',
+  },
+  dayTextPast: {
+    color: '#475569',
   },
   dayCellBooked: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
