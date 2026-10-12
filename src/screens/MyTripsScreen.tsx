@@ -445,31 +445,61 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
         <Modal visible={true} transparent={true} animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Trip Reservation Details</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={styles.modalTitle}>🎫 Stay Voucher Pass</Text>
+                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                  <Text style={{ color: '#10b981', fontSize: 10, fontWeight: '800' }}>
+                    REF: #{detailsModalItem.id.slice(0, 8).toUpperCase()}
+                  </Text>
+                </View>
+              </View>
               <Text style={styles.modalSubtitle}>{detailsModalItem.listing?.name}</Text>
 
-              <View style={styles.detailRowModal}>
-                <Text style={styles.detailLabelModal}>Host:</Text>
-                <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.name || 'Local Host'}</Text>
+              <View style={{ backgroundColor: '#070a12', borderRadius: 14, padding: 12, marginVertical: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Host Property:</Text>
+                  <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.name || 'Local Host'}</Text>
+                </View>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Address:</Text>
+                  <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.address || 'Sri Lanka'}</Text>
+                </View>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Stay Dates:</Text>
+                  <Text style={styles.detailValModal}>{formatDateRange(detailsModalItem.checkIn, detailsModalItem.checkOut)}</Text>
+                </View>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Check-In Time:</Text>
+                  <Text style={styles.detailValModal}>From 2:00 PM</Text>
+                </View>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Check-Out Time:</Text>
+                  <Text style={styles.detailValModal}>Until 11:00 AM</Text>
+                </View>
+                <View style={styles.detailRowModal}>
+                  <Text style={styles.detailLabelModal}>Payment Status:</Text>
+                  <Text style={{ color: detailsModalItem.paymentStatus === 'UNPAID' ? '#f59e0b' : '#10b981', fontWeight: '700', fontSize: 12 }}>
+                    {detailsModalItem.paymentStatus === 'UNPAID' ? '🏨 Pay at Property' : '✓ Paid Online'}
+                  </Text>
+                </View>
+                <View style={[styles.detailRowModal, { borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)', paddingTop: 8, marginTop: 4 }]}>
+                  <Text style={styles.detailLabelModal}>Total Amount:</Text>
+                  <Text style={styles.detailValModalPrice}>${detailsModalItem.totalPrice.toFixed(2)}</Text>
+                </View>
               </View>
-              <View style={styles.detailRowModal}>
-                <Text style={styles.detailLabelModal}>Address:</Text>
-                <Text style={styles.detailValModal}>{detailsModalItem.listing?.business?.address || 'Sri Lanka'}</Text>
-              </View>
-              <View style={styles.detailRowModal}>
-                <Text style={styles.detailLabelModal}>Stay Dates:</Text>
-                <Text style={styles.detailValModal}>{formatDateRange(detailsModalItem.checkIn, detailsModalItem.checkOut)}</Text>
-              </View>
-              <View style={styles.detailRowModal}>
-                <Text style={styles.detailLabelModal}>Total Price:</Text>
-                <Text style={styles.detailValModalPrice}>${detailsModalItem.totalPrice}</Text>
+
+              <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', padding: 10, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.2)', alignItems: 'center' }}>
+                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>🛡️ Verified Booking Pass</Text>
+                <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                  Present this digital voucher to your host at the front desk upon arrival.
+                </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.closeDetailsBtn}
                 onPress={() => setDetailsModalItem(null)}
               >
-                <Text style={styles.closeDetailsBtnText}>Close</Text>
+                <Text style={styles.closeDetailsBtnText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>

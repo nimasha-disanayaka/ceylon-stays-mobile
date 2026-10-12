@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Listing, User } from '../types';
 import { apiClient } from '../api/client';
@@ -23,6 +24,8 @@ interface DetailScreenProps {
   onOpenAuth: () => void;
 }
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export const DetailScreen: React.FC<DetailScreenProps> = ({
   listing,
   currentUser,
@@ -30,6 +33,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   onBookingSuccess,
   onOpenAuth,
 }) => {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [checkIn, setCheckIn] = useState('2026-10-10');
   const [checkOut, setCheckOut] = useState('2026-10-15');
   const [submitting, setSubmitting] = useState(false);
@@ -243,19 +247,46 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     }
   };
 
-  const imageUrl = listing.images && listing.images.length > 0 
-    ? listing.images[0] 
-    : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
+  const images = (listing.images && listing.images.length > 0)
+    ? listing.images
+    : (listing.business?.imageUrls && listing.business.imageUrls.length > 0)
+    ? listing.business.imageUrls
+    : [
+        'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80',
+      ];
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Banner Header */}
+        {/* Banner Header with Photo Carousel */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: imageUrl }} style={styles.image} />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => {
+              const slide = Math.round(
+                e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width
+              );
+              if (slide !== activeImageIndex) setActiveImageIndex(slide);
+            }}
+            scrollEventThrottle={16}
+          >
+            {images.map((imgUri, idx) => (
+              <Image key={idx} source={{ uri: imgUri }} style={styles.carouselImage} />
+            ))}
+          </ScrollView>
+
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backButtonText}>&larr; Back</Text>
           </TouchableOpacity>
+
+          <View style={styles.photoCountBadge}>
+            <Text style={styles.photoCountText}>📷 {activeImageIndex + 1} / {images.length}</Text>
+          </View>
         </View>
 
         <View style={styles.detailsBody}>
@@ -610,11 +641,29 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-  },
-  image: {
-    width: '100%',
     height: 280,
     backgroundColor: '#131b2e',
+  },
+  carouselImage: {
+    width: SCREEN_WIDTH,
+    height: 280,
+    backgroundColor: '#131b2e',
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    bottom: 16,
+    right: 20,
+    backgroundColor: 'rgba(7, 10, 18, 0.78)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  photoCountText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   backButton: {
     position: 'absolute',
