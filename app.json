@@ -10,6 +10,14 @@
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d80b740a-0654-4f18-8bf0-afc743ddb576"
+      }
+    },
+    "android": {
+      "package": "com.nimuu.bookingplatformmobile"
     }
   }
 }
