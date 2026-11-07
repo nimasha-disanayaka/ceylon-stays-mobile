@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 const debuggerHost = Constants.expoConfig?.hostUri;
 const localhostIp = debuggerHost ? debuggerHost.split(':')[0] : '192.168.8.138';
 
-export const API_BASE_URL = `http://${localhostIp}:5000/api`;
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || `http://${localhostIp}:5000/api`;
 console.log('📱 Mobile App connecting to Backend API at:', API_BASE_URL);
 
 export const apiClient = axios.create({

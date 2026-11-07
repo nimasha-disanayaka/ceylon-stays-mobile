@@ -17,7 +17,7 @@
       }
     },
     "android": {
-      "package": "com.nimuu.bookingplatformmobile"
+      "package": "com.nimuu.bookingplatformmobile",
     }
   }
 }

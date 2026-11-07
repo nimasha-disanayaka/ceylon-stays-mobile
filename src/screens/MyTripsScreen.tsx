@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Booking } from '../types';
 import { apiClient } from '../api/client';
+import { getLocalBookings, updateLocalBookingStatus } from '../api/bookingsStore';
 
 interface MyTripsScreenProps {
   onBack: () => void;
@@ -45,18 +46,48 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
 
   const fetchMyBookings = async () => {
     try {
-      const res = await apiClient.get('/bookings/my-bookings');
-      const fetchedBookings = res.data.bookings || [];
-      setBookings(fetchedBookings);
+      const localList = getLocalBookings();
+      let fetchedBookings: Booking[] = [];
+
+      try {
+        const res = await apiClient.get('/bookings/my-bookings');
+        fetchedBookings = res.data.bookings || [];
+      } catch (networkErr) {
+        // Backend offline or unreachable
+      }
+
+      // Sync local bookings with live server status (e.g. when Owner confirms or declines)
+      const updatedLocal = localList.map((loc) => {
+        const serverMatch = fetchedBookings.find((fb: any) => fb.id === loc.id);
+        if (serverMatch) {
+          return {
+            ...loc,
+            status: serverMatch.status,
+            paymentStatus: serverMatch.paymentStatus,
+          };
+        }
+        return loc;
+      });
+
+      const combinedMap = new Map<string, any>();
+      updatedLocal.forEach((b) => combinedMap.set(b.id, b));
+      fetchedBookings.forEach((b: any) => {
+        const existing = combinedMap.get(b.id);
+        combinedMap.set(b.id, { ...existing, ...b });
+      });
+
+      const combined = Array.from(combinedMap.values());
+
+      setBookings(combined);
 
       // Extract DB reviews
       const reviewedIds: string[] = [];
-      fetchedBookings.forEach((b: any) => {
+      combined.forEach((b: any) => {
         if (b.review) {
           reviewedIds.push(b.id);
           globalPersistentUserReviews[b.id] = {
             rating: b.review.rating || 5,
-            comment: b.review.comment || 'Beautiful stay, walking distance to the beach.',
+            comment: b.review.comment || '',
             reply: b.review.reply || b.review.hostReply,
           };
         }
@@ -174,6 +205,7 @@ export const MyTripsScreen: React.FC<MyTripsScreenProps> = ({
           ? `$${policy.refundAmount.toFixed(2)} (${policy.refundPercent}% refund)` 
           : '$0.00 (non-refundable)';
 
+        updateLocalBookingStatus(cancelModalItem.id, 'CANCELLED');
         setBookings((prev) =>
           prev.map((b) => (b.id === cancelModalItem.id ? { ...b, status: 'CANCELLED' } : b))
         );

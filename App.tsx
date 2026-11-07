@@ -1,25 +1,59 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  BackHandler,
+} from 'react-native';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { MyTripsScreen } from './src/screens/MyTripsScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { Listing, User } from './src/types';
+import { setAuthToken } from './src/api/client';
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<'SEARCH' | 'DETAIL' | 'MY_TRIPS'>('SEARCH');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'user-traveler-1',
-    name: 'John M.',
-    email: 'traveler@gmail.com',
-    role: 'FOREIGNER',
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
+
+  // Android Hardware Back button handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (authVisible) {
+        setAuthVisible(false);
+        return true;
+      }
+      if (activeScreen === 'DETAIL') {
+        setActiveScreen('SEARCH');
+        return true;
+      }
+      if (activeScreen === 'MY_TRIPS') {
+        setActiveScreen('SEARCH');
+        return true;
+      }
+      return false;
+    };
+
+    const backHandlerSubscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress
+    );
+
+    return () => backHandlerSubscription.remove();
+  }, [activeScreen, authVisible]);
 
   const handleSelectListing = (listing: Listing) => {
     setSelectedListing(listing);
     setActiveScreen('DETAIL');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setAuthToken(null);
   };
 
   return (
@@ -83,6 +117,8 @@ export default function App() {
         visible={authVisible}
         onClose={() => setAuthVisible(false)}
         onAuthSuccess={(user) => setCurrentUser(user)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
     </View>
   );
